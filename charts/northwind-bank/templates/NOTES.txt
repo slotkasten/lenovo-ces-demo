@@ -1,0 +1,37 @@
+{{ .Values.app.bankName }} is deploying.
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Image:     {{ include "northwind.image" . }}
+
+Components:
+  • Web app (FastAPI)           {{ include "northwind.fullname" . }}
+  • PostgreSQL + pgvector       {{ if .Values.postgresql.enabled }}{{ include "northwind.postgresql.fullname" . }} (in-cluster){{ else }}external: {{ .Values.external.host }}{{ end }}
+  • Vector store                pgvector ({{ .Values.embedDim }}-dim, provider: {{ .Values.embedProvider }})
+  • LLM                         {{ if .Values.llm.enabled }}Ollama {{ .Values.llm.chatModel }} (in-cluster){{ else }}disabled — deterministic RAG templates{{ end }}
+  • Guardrails                  {{ if .Values.app.guardrailsEnabled }}ENABLED (prompt-injection attempts are refused){{ else }}disabled (prompt-injection demo is live){{ end }}
+
+1. Wait for the seed job and web pod to be ready:
+
+   kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "northwind.fullname" . }}
+   kubectl -n {{ .Release.Namespace }} get pods
+
+2. Reach the portal:
+{{- if .Values.ingress.enabled }}
+   http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host | default "<ingress-host>" }}{{ .Values.ingress.path }}
+{{- else if .Values.route.enabled }}
+   Run: kubectl -n {{ .Release.Namespace }} get route {{ include "northwind.fullname" . }} -o jsonpath='{.spec.host}'
+{{- else if eq .Values.service.type "LoadBalancer" }}
+   kubectl -n {{ .Release.Namespace }} get svc {{ include "northwind.fullname" . }} -w
+   (open http://<EXTERNAL-IP>)
+{{- else }}
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "northwind.fullname" . }} 8080:{{ .Values.service.port }}
+   (open http://localhost:8080)
+{{- end }}
+
+3. Protect it with Veeam Kasten:
+   kubectl apply -f kasten/blueprint.yaml
+   kubectl apply -f kasten/blueprintbinding.yaml
+   Then create a Kasten backup policy for namespace {{ .Release.Namespace }}.
+
+Powered by Lenovo and Veeam. All data in this demo is synthetic.

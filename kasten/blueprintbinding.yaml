@@ -1,0 +1,31 @@
+apiVersion: config.kio.kasten.io/v1alpha1
+kind: BlueprintBinding
+metadata:
+  name: northwind-postgresql-binding
+  namespace: kasten-io
+# Binds the blueprint to the Northwind demo's PostgreSQL StatefulSet fleet-wide,
+# while letting an explicit per-StatefulSet annotation override it.
+spec:
+  blueprintRef:
+    name: northwind-postgresql-blueprint
+    namespace: kasten-io
+  resources:
+    matchAll:
+      - type:
+          operator: In
+          values:
+            - group: apps
+              resource: statefulsets
+      - labels:
+          key: app.kubernetes.io/name
+          operator: In
+          values:
+            - northwind-bank
+      - labels:
+          key: app.kubernetes.io/component
+          operator: In
+          values:
+            - postgresql
+      - annotations:
+          key: kanister.kasten.io/blueprint
+          operator: DoesNotExist

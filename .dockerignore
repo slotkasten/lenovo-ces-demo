@@ -1,0 +1,13 @@
+.git
+.github
+charts
+kasten
+docs
+tests
+*.md
+.DS_Store
+__pycache__
+*.pyc
+.venv
+venv
+scratch

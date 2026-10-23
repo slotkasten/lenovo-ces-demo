@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Northwind Bank">
+  <defs>
+    <linearGradient id="nw" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b4965"/><stop offset="1" stop-color="#0d2b3e"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="10" fill="url(#nw)"/>
+  <path d="M14 33V15l10 11V15M24 26l10-11v18" fill="none" stroke="#c9a24b" stroke-width="2.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

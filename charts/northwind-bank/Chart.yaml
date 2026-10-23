@@ -1,0 +1,14 @@
+apiVersion: v2
+name: northwind-bank
+description: Northwind Bank & Trust — an AI RAG banking demo on pgvector, showing why data protection matters (Lenovo + Veeam Kasten, CES 2026)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/kastendevhub/lenovo-ces-demo
+icon: https://raw.githubusercontent.com/kastendevhub/lenovo-ces-demo/main/app/static/img/northwind-mark.svg
+keywords: [ai, rag, pgvector, postgresql, banking, kasten, veeam, lenovo, demo, security]
+sources:
+  - https://github.com/kastendevhub/lenovo-ces-demo
+maintainers:
+  - name: Matt Slotten
+    url: https://veeamkasten.dev

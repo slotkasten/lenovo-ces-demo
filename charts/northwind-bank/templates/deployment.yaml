@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "northwind.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "northwind.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "northwind.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "northwind.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: {{ include "northwind.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-db
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+            runAsUser: 10001
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for PostgreSQL at {{ include "northwind.postgresql.host" . }}:{{ include "northwind.postgresql.port" . }}..."
+              until pg_isready -h {{ include "northwind.postgresql.host" . }} -p {{ include "northwind.postgresql.port" . }} -U {{ include "northwind.postgresql.username" . }}; do
+                sleep 3
+              done
+              echo "PostgreSQL is ready."
+      containers:
+        - name: web
+          image: {{ include "northwind.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            {{- include "northwind.commonEnv" . | nindent 12 }}
+            - name: PORT
+              value: "8080"
+            - name: WEB_CONCURRENCY
+              value: {{ .Values.app.webConcurrency | quote }}
+            - name: BANK_NAME
+              value: {{ .Values.app.bankName | quote }}
+            - name: BANK_TAGLINE
+              value: {{ .Values.app.bankTagline | quote }}
+            - name: ASSISTANT_NAME
+              value: {{ .Values.app.assistantName | quote }}
+            - name: GUARDRAILS_ENABLED
+              value: {{ .Values.app.guardrailsEnabled | quote }}
+            - name: RETRIEVAL_K
+              value: {{ .Values.app.retrievalK | quote }}
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: {path: /ready, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}

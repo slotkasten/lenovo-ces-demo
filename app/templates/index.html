@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ bank_name }} — Online Banking</title>
+  <meta name="description" content="{{ bank_name }} secure online banking portal. A Lenovo and Veeam technology demonstration.">
+  <link rel="icon" href="/static/img/northwind-mark.svg">
+  <link rel="stylesheet" href="/static/css/materialdesignicons.min.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <img src="/static/img/northwind-mark.svg" alt="">
+        <div>
+          <div class="name">{{ bank_name }}</div>
+          <div class="tag">{{ bank_tagline }}</div>
+        </div>
+      </div>
+      <nav class="topnav">
+        <a href="#accounts"><span class="mdi mdi-view-dashboard-outline"></span> Accounts</a>
+        <a href="#activity"><span class="mdi mdi-swap-horizontal"></span> Activity</a>
+        <a href="#assistant"><span class="mdi mdi-robot-happy-outline"></span> Assistant</a>
+        <a href="#security"><span class="mdi mdi-shield-lock-outline"></span> Security</a>
+      </nav>
+      <div class="topbar-spacer"></div>
+      <div class="session-pill">
+        <span class="avatar" id="avatar">–</span>
+        <span class="who"><span id="who-name">Loading…</span><small id="who-sub">customer</small></span>
+        <span class="role-tag" id="role-tag">customer</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- controls -->
+    <section class="controls">
+      <div class="field">
+        <label for="persona"><span class="mdi mdi-account-switch-outline"></span> Signed in as</label>
+        <select id="persona"></select>
+      </div>
+      <div class="spacer"></div>
+      <div class="status-dot"><span class="dot" id="dot-db"></span> Database <b id="st-db">…</b></div>
+      <div class="status-dot"><span class="dot" id="dot-llm"></span> <b id="st-llm">…</b></div>
+      <div class="status-dot"><span class="dot" id="dot-guard"></span> Guardrails <b id="st-guard">…</b></div>
+      <button class="btn btn-ghost" id="btn-reset"><span class="mdi mdi-refresh"></span> New session</button>
+    </section>
+
+    <div class="banner-strip" id="strip">
+      <span class="mdi" id="strip-icon"></span>
+      <span id="strip-text"></span>
+      <button class="btn btn-ghost" id="strip-dismiss"><span class="mdi mdi-close"></span> Dismiss</button>
+    </div>
+
+    <!-- left column: accounts + activity -->
+    <div>
+      <section class="card" id="accounts" style="margin-bottom:22px">
+        <div class="card-head">
+          <span class="mdi mdi-bank-outline"></span>
+          <h2>Account Summary</h2>
+          <span class="sub" id="acct-sub"></span>
+        </div>
+        <div class="card-body" id="accounts-body">
+          <div class="empty"><span class="mdi mdi-loading mdi-spin"></span> Loading accounts…</div>
+        </div>
+      </section>
+
+      <section class="card" id="activity">
+        <div class="card-head">
+          <span class="mdi mdi-swap-horizontal-bold"></span>
+          <h2>Recent Activity</h2>
+        </div>
+        <div class="card-body" id="activity-body">
+          <div class="empty"><span class="mdi mdi-loading mdi-spin"></span> Loading transactions…</div>
+        </div>
+      </section>
+
+      <section class="card" id="security" style="margin-top:22px">
+        <div class="card-head">
+          <span class="mdi mdi-shield-alert-outline"></span>
+          <h2>Security &amp; Audit Log</h2>
+          <span class="sub"><a href="#" id="refresh-audit">Refresh</a></span>
+        </div>
+        <div class="card-body" id="audit-body">
+          <div class="empty"><span class="mdi mdi-check-circle-outline"></span> No security events recorded.</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- right column: assistant -->
+    <section class="card assistant" id="assistant">
+      <div class="card-head">
+        <span class="mdi mdi-robot-happy-outline"></span>
+        <h2 id="assistant-title">{{ assistant_name }}</h2>
+        <span class="sub">RAG over pgvector</span>
+      </div>
+      <div class="card-body">
+        <div class="chat-scroll" id="chat"></div>
+        <div class="suggests" id="suggests"></div>
+        <form class="composer" id="composer" autocomplete="off">
+          <input id="chat-input" name="message" placeholder="Ask about your balance, fees, rates…" maxlength="2000" required>
+          <button class="btn btn-primary" type="submit"><span class="mdi mdi-send"></span> Send</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- admin modal (unlocked by the privilege-escalation scenario) -->
+  <div class="modal-backdrop" id="admin-modal">
+    <div class="modal card">
+      <div class="card-head">
+        <span class="mdi mdi-shield-crown-outline" style="color:var(--lenovo)"></span>
+        <h2>Administrator Console</h2>
+        <span class="sub" style="margin-left:auto"><a href="#" id="admin-close">Close</a></span>
+      </div>
+      <div class="card-body" id="admin-body"></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="powered">
+        Powered by
+        <img src="/static/img/lenovo-logo.svg" alt="Lenovo">
+        and
+        <span class="veeam-badge"><span class="mdi mdi-shield-check"></span> Veeam</span>
+      </span>
+      <span class="sep">|</span>
+      <span class="disclaimer">
+        {{ bank_name }} is a fictional institution created for a technology demonstration.
+        All customers, accounts and balances are synthetic. Lenovo provides the AI infrastructure;
+        Veeam provides application-consistent data protection and recovery.
+      </span>
+      <span class="foot-right"><span class="mdi mdi-lock"></span> Demo build v{{ version }}</span>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

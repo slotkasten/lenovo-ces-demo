@@ -1,0 +1,101 @@
+{{- if .Values.llm.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "northwind.ollama.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "northwind.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  type: ClusterIP
+  ports:
+    - port: 11434
+      targetPort: http
+      name: http
+  selector:
+    {{- include "northwind.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "northwind.ollama.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "northwind.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  serviceName: {{ include "northwind.ollama.fullname" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "northwind.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ollama
+  template:
+    metadata:
+      labels:
+        {{- include "northwind.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ollama
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # Pull the chat and embedding models once the server is up, so the app
+      # and seed job never block on a cold model.
+      lifecycle: {}
+      containers:
+        - name: ollama
+          image: "{{ .Values.llm.image.repository }}:{{ .Values.llm.image.tag }}"
+          imagePullPolicy: {{ .Values.llm.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 11434
+          env:
+            - name: OLLAMA_HOST
+              value: "0.0.0.0"
+            - name: OLLAMA_KEEP_ALIVE
+              value: "30m"
+            - name: NW_CHAT_MODEL
+              value: {{ .Values.llm.chatModel | quote }}
+            - name: NW_EMBED_MODEL
+              value: {{ .Values.llm.embedModel | quote }}
+          lifecycle:
+            postStart:
+              exec:
+                # Best-effort warm pull; the readiness probe gates traffic.
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    (sleep 5; ollama pull "$NW_CHAT_MODEL"; ollama pull "$NW_EMBED_MODEL") >/tmp/pull.log 2>&1 &
+          readinessProbe:
+            httpGet: {path: /api/tags, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.llm.resources | nindent 12 }}
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+  {{- if .Values.llm.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: models
+        labels:
+          {{- include "northwind.labels" . | nindent 10 }}
+          app.kubernetes.io/component: ollama
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.llm.persistence.storageClass }}
+        storageClassName: {{ .Values.llm.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.llm.persistence.size | quote }}
+  {{- else }}
+      volumes:
+        - name: models
+          emptyDir: {}
+  {{- end }}
+{{- end }}

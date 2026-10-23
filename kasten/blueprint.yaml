@@ -1,0 +1,123 @@
+apiVersion: cr.kanister.io/v1alpha1
+kind: Blueprint
+metadata:
+  name: northwind-postgresql-blueprint
+  namespace: kasten-io
+# Application-consistent backup for the Northwind Bank demo's PostgreSQL +
+# pgvector StatefulSet. Kasten is the data mover: it snapshots the single PGDATA
+# PVC directly. This blueprint only makes the on-disk state consistent at snapshot
+# time (Pattern 2 — Quiesce), analogous to the Bitnami MySQL FTWRL blueprint.
+#
+# PostgreSQL stores the relational bank data (customers, accounts, transactions),
+# the chat/session tables, the audit log, AND the pgvector knowledge-base
+# embeddings in the same database — so one consistent snapshot protects both the
+# bank's records and the AI assistant's vector store together.
+actions:
+  backupPrehook:
+    # Called BEFORE the PVC snapshot. A non-exclusive low-level backup is started
+    # in a BACKGROUND psql session (kept alive with pg_sleep) so the "backup in
+    # progress" state is actually held while Kasten snapshots the PVC. A CHECKPOINT
+    # is forced first to flush dirty buffers, which minimises WAL replay on restore.
+    # PGDATA (including pg_wal) lives on one PVC, so the atomic CSI snapshot plus
+    # WAL replay yields a consistent restore point.
+    phases:
+      - func: KubeExec
+        name: quiescePostgres
+        args:
+          namespace: "{{ .StatefulSet.Namespace }}"
+          pod: "{{ .StatefulSet.Name }}-0"
+          container: postgresql
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              DB="${POSTGRES_DB:-northwind}"
+              U="${POSTGRES_USER:-northwind}"
+              rm -f /tmp/nw-backup.pid /tmp/nw-backup.log
+              psql -U "$U" -d "$DB" -Atc "CHECKPOINT;"
+              # Hold a non-exclusive base backup open in a background session.
+              nohup psql -U "$U" -d "$DB" -Atc \
+                "SELECT pg_backup_start('kasten', fast => true); SELECT pg_sleep(3600);" \
+                > /tmp/nw-backup.log 2>&1 &
+              echo $! > /tmp/nw-backup.pid
+              sleep 3
+              if psql -U "$U" -d "$DB" -Atc "SELECT pg_is_in_backup();" 2>/dev/null | grep -qx t \
+                 || psql -U "$U" -d "$DB" -Atc "SELECT count(*) FROM pg_stat_activity WHERE backend_type='client backend' AND query LIKE 'SELECT pg_backup_start%';" | grep -qvx 0; then
+                echo "PostgreSQL quiesced: base backup in progress (PID $(cat /tmp/nw-backup.pid))"
+              else
+                echo "WARNING: could not confirm backup state; relying on crash-consistent snapshot + WAL replay"
+                cat /tmp/nw-backup.log || true
+              fi
+
+  backupPosthook:
+    # Called AFTER the PVC snapshot is ready. Ends the low-level backup cleanly
+    # (pg_backup_stop in a fresh session is valid for a non-exclusive backup only
+    # from the SAME session, so we stop by terminating the holder and, as the
+    # authoritative finaliser, rely on WAL recovery). We terminate the background
+    # holder session to release the backup state.
+    phases:
+      - func: KubeExec
+        name: unquiescePostgres
+        args:
+          namespace: "{{ .StatefulSet.Namespace }}"
+          pod: "{{ .StatefulSet.Name }}-0"
+          container: postgresql
+          command:
+            - bash
+            - -c
+            - |
+              DB="${POSTGRES_DB:-northwind}"
+              U="${POSTGRES_USER:-northwind}"
+              # Stop the backup from within a holder-aware call: terminate the
+              # background session that holds pg_backup_start, which ends the
+              # non-exclusive backup. Then force a CHECKPOINT to bound WAL replay.
+              psql -U "$U" -d "$DB" -Atc \
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+                   WHERE backend_type='client backend'
+                     AND query LIKE 'SELECT pg_backup_start%';" || true
+              if [ -f /tmp/nw-backup.pid ]; then
+                kill "$(cat /tmp/nw-backup.pid)" 2>/dev/null || true
+                rm -f /tmp/nw-backup.pid /tmp/nw-backup.log
+              fi
+              psql -U "$U" -d "$DB" -Atc "CHECKPOINT;" || true
+              echo "PostgreSQL unquiesced: backup state released"
+
+  restorePosthook:
+    # Called AFTER Kasten restores the PVC and re-applies the StatefulSet. The
+    # Northwind PostgreSQL is a plain StatefulSet (no operator), so Kasten replaces
+    # the PVC natively; PostgreSQL performs WAL crash recovery automatically on
+    # startup. This hook waits for the pod to be Ready, then verifies the database
+    # is writable and that the pgvector extension and key tables are present.
+    phases:
+      - func: WaitV2
+        name: waitForPostgresReady
+        args:
+          timeout: 300s
+          conditions:
+            anyOf:
+              - condition: '{{ range .status.conditions }}{{ if and (eq .type "Ready") (eq .status "True") }}true{{ end }}{{ end }}'
+                objectReference:
+                  apiVersion: v1
+                  group: ""
+                  resource: pods
+                  name: "{{ .StatefulSet.Name }}-0"
+                  namespace: "{{ .StatefulSet.Namespace }}"
+      - func: KubeExec
+        name: verifyPostgres
+        args:
+          namespace: "{{ .StatefulSet.Namespace }}"
+          pod: "{{ .StatefulSet.Name }}-0"
+          container: postgresql
+          command:
+            - bash
+            - -c
+            - |
+              set -e
+              DB="${POSTGRES_DB:-northwind}"
+              U="${POSTGRES_USER:-northwind}"
+              psql -U "$U" -d "$DB" -Atc "SELECT 1;" >/dev/null
+              psql -U "$U" -d "$DB" -Atc "SELECT extversion FROM pg_extension WHERE extname='vector';"
+              echo "customers=$(psql -U "$U" -d "$DB" -Atc "SELECT count(*) FROM customers;")"
+              echo "knowledge_documents=$(psql -U "$U" -d "$DB" -Atc "SELECT count(*) FROM knowledge_documents;")"
+              echo "PostgreSQL verified healthy after restore"

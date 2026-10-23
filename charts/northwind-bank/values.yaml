@@ -1,0 +1,149 @@
+# Default values for the Northwind Bank demo.
+# The entire application (web tier, PostgreSQL+pgvector, optional LLM) deploys
+# from this one chart so it can be installed with a single `helm install`.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  registry: ghcr.io
+  repository: kastendevhub/northwind-bank
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# ---------------------------------------------------------------------------
+# Web application (FastAPI + Uvicorn)
+# ---------------------------------------------------------------------------
+app:
+  replicaCount: 1
+  webConcurrency: 2
+  bankName: "Northwind Bank & Trust"
+  bankTagline: "Private & Commercial Banking"
+  assistantName: "Northwind Assistant"
+  # Toggle the prompt-injection guardrails. false = demo the attack (default);
+  # true = demo the mitigated "after" state where the same prompts are refused.
+  guardrailsEnabled: false
+  retrievalK: 3
+  resources:
+    requests: {cpu: 100m, memory: 192Mi}
+    limits: {memory: 512Mi}
+
+# ---------------------------------------------------------------------------
+# PostgreSQL with the pgvector extension (relational DB + vector store)
+# ---------------------------------------------------------------------------
+postgresql:
+  # Set enabled=false to point at an external PostgreSQL (fill in `external`).
+  enabled: true
+  image:
+    repository: pgvector/pgvector
+    tag: "0.8.7-pg17"
+    pullPolicy: IfNotPresent
+  auth:
+    database: northwind
+    username: northwind
+    # If empty, a random password is generated on first install and stored in a
+    # Secret. Provide existingSecret to manage the password yourself.
+    password: ""
+    existingSecret: ""
+    secretKeys:
+      passwordKey: password
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: ""          # "" = cluster default; must support CSI snapshots for Kasten
+    resources:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits: {memory: 1Gi}
+  service:
+    port: 5432
+
+# External PostgreSQL (used only when postgresql.enabled=false)
+external:
+  host: ""
+  port: 5432
+  database: northwind
+  username: northwind
+  existingSecret: ""
+  secretKeys:
+    passwordKey: password
+
+# ---------------------------------------------------------------------------
+# Embeddings + optional lightweight open-weight LLM (Ollama, CPU-friendly)
+# ---------------------------------------------------------------------------
+# embedProvider: "hashing" needs no model and runs anywhere (default, GPU-free).
+#                "ollama"  uses an Ollama embedding model (requires llm.enabled).
+embedProvider: hashing
+embedDim: 384
+
+llm:
+  # Off by default: the booth hardware has no GPU, so the assistant answers from
+  # retrieved documents with deterministic templates. Turn on to run a small
+  # open-weight model on CPU via Ollama (bundled as a subchart-free Deployment).
+  enabled: false
+  chatModel: "llama3.2:1b"
+  embedModel: "all-minilm"
+  image:
+    repository: ollama/ollama
+    tag: "0.12.6"
+    pullPolicy: IfNotPresent
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+  resources:
+    requests: {cpu: 500m, memory: 2Gi}
+    limits: {memory: 6Gi}
+
+# ---------------------------------------------------------------------------
+# Database seeding (schema + synthetic bank data + knowledge base)
+# ---------------------------------------------------------------------------
+seed:
+  enabled: true
+  # Re-run on helm upgrade. The job is idempotent (only fills empty tables).
+  waitSeconds: 600
+
+# ---------------------------------------------------------------------------
+# Networking
+# ---------------------------------------------------------------------------
+service:
+  type: LoadBalancer      # LoadBalancer works on the RKE2/MetalLB test cluster
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  path: /
+  pathType: Prefix
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ""
+
+route:                    # OpenShift Route
+  enabled: false
+  host: ""
+  annotations: {}
+  tls:
+    enabled: false
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+serviceAccount:
+  create: true
+  name: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
