@@ -148,21 +148,10 @@ kubectl delete ns northwind-demo
 
 Full list: [`charts/northwind-bank/values.yaml`](charts/northwind-bank/values.yaml).
 
-> **Image**: the chart defaults to `ghcr.io/kastendevhub/northwind-bank`, the intended home. The
-> validated build is published at `ghcr.io/slotkasten/northwind-bank:0.1.0` (currently a **private**
-> package). To deploy it, either make that package public in GitHub, or create a pull secret and pass
-> it to the chart:
->
-> ```bash
-> kubectl create secret docker-registry ghcr-pull -n northwind-demo \
->   --docker-server=ghcr.io --docker-username=<gh-user> --docker-password=<gh-token>
-> helm install northwind ./charts/northwind-bank -n northwind-demo --create-namespace \
->   --set image.repository=slotkasten/northwind-bank \
->   --set 'imagePullSecrets[0].name=ghcr-pull'
-> ```
->
-> Publishing under the `kastendevhub` org requires an org owner to create the package first (a
-> member token cannot create it).
+> **Image**: the chart defaults to `ghcr.io/slotkasten/northwind-bank`, a **public** GHCR package,
+> so `helm install ./charts/northwind-bank` pulls it with no registry secret. To host it under the
+> `kastendevhub` org instead, an org owner must create the package first (a member token cannot), then
+> set `--set image.repository=kastendevhub/northwind-bank`.
 
 > **Storage class**: the PVC that holds `PGDATA` must be backed by a CSI driver that supports
 > snapshots, with a `VolumeSnapshotClass` registered with Kasten. On the RKE2 test cluster this is

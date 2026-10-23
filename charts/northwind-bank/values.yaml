@@ -7,7 +7,7 @@ fullnameOverride: ""
 
 image:
   registry: ghcr.io
-  repository: kastendevhub/northwind-bank
+  repository: slotkasten/northwind-bank
   tag: ""            # defaults to .Chart.AppVersion
   pullPolicy: IfNotPresent
 imagePullSecrets: []

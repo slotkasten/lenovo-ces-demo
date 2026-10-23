@@ -4,7 +4,7 @@
 
 | Component | Image | Role |
 |---|---|---|
-| Web app | `ghcr.io/kastendevhub/northwind-bank` | FastAPI + Uvicorn; serves the portal and `/api/*` |
+| Web app | `ghcr.io/slotkasten/northwind-bank` | FastAPI + Uvicorn; serves the portal and `/api/*` |
 | Database | `pgvector/pgvector:0.8.7-pg17` | PostgreSQL 17 with the `vector` extension |
 | LLM (optional) | `ollama/ollama` | CPU inference for a small open-weight model |
 | Seed | same as web app | Helm post-install/upgrade Job: schema + data |

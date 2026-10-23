@@ -42,5 +42,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/kastendevhub/northwind-bank:latest
-            ghcr.io/kastendevhub/northwind-bank:${{ github.sha }}
+            ghcr.io/slotkasten/northwind-bank:latest
+            ghcr.io/slotkasten/northwind-bank:${{ github.sha }}

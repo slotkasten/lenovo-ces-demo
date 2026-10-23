@@ -8,7 +8,7 @@
 set -euo pipefail
 
 REGISTRY="${REGISTRY:-ghcr.io}"
-REPO="${REPO:-kastendevhub/northwind-bank}"
+REPO="${REPO:-slotkasten/northwind-bank}"
 TAG="${TAG:-0.1.0}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 NAMESPACE="northwind-demo"
